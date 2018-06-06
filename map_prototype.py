@@ -1,6 +1,7 @@
 import vtk
 import numpy as np
 import pyproj
+import glider
 
 from keypressInteractorStyle import KeyPressInteractorStyle
 
@@ -10,7 +11,7 @@ def main():
 
   EARTH_RADIUS = 6371009
 
-  # Map (Rectangular) coordinates 
+  # Map (Rectangular) coordinates
   MAP_LEFT_TOP_COORD = (63.282190416278205, 12.804928280214138)
   MAP_RIGHT_TOP_COORD =   (63.29437070004316, 13.247244781368963)
   MAP_LEFT_BOTTOM_COORD = (63.133525618051515, 12.825512878974331)
@@ -73,15 +74,15 @@ def main():
 
   for y in range(cols - maxLatitude, cols - minLatitude):
     transform2 = vtk.vtkTransform()
-    transform2.RotateZ(y * latitudeDelta + MAP_MIN_Y)
+    transform2.RotateZ(ELEVATION_MAX_Y - y * latitudeDelta)#MAP_MIN_Y)
 
     transform1 = vtk.vtkTransform()
-    transform1.RotateY(-MAP_MIN_X)
+    transform1.RotateY(MAP_MIN_X)
 
     for x in range(minLongitude, maxLongitude):
       p = [EARTH_RADIUS + elevationModel[y * rows + x], 0, 0]
-    
-      transform1.RotateY(-longitudeDelta)
+
+      transform1.RotateY(longitudeDelta)
 
       # Apply tranformation
       points.InsertNextPoint(
@@ -111,25 +112,32 @@ def main():
   actor.SetMapper(mapper)
   actor.GetProperty().SetPointSize(3)
 
+  gliderData = glider.loadGliderTrajectory("data/vtkgps.txt")
+  colors = glider.computeGliderTrajectoryColors(gliderData.gliderTrajectory, gliderData.minVerticalSpeed, gliderData.maxVerticalSpeed)
+  glidersActors = glider.createActors(gliderData.vtkPoints, colors, gliderData.gliderTrajectory)
 
   renderer = vtk.vtkRenderer()
   renderer.AddActor(actor)
-
-  # Positionning the camera
-  renderer.SetBackground(0.95, 0.95, 0.95)
-  renderer.GetActiveCamera().SetPosition(EARTH_RADIUS + 100000, 0, 0)
-  renderer.GetActiveCamera().Azimuth(-midLongitude)
-  renderer.GetActiveCamera().Elevation(midLatitude)
-  renderer.GetActiveCamera().SetFocalPoint(focalPoint)
-  renderer.GetActiveCamera().Dolly(0.1)
-  renderer.GetActiveCamera().SetRoll(180)  # Don't know why we need to rotate 180°
-  renderer.ResetCamera()
+  renderer.AddActor(glidersActors[0])
+  renderer.AddActor(glidersActors[1])
 
   renderWindow = vtk.vtkRenderWindow()
   renderWindow.SetSize(1200, 720)
   renderWindow.AddRenderer(renderer)
   renderWindowInteractor = vtk.vtkRenderWindowInteractor()
   renderWindowInteractor.SetRenderWindow(renderWindow)
+  
+  # Positionning the camera
+  renderer.SetBackground(0, 0, 0)
+  #renderer.GetActiveCamera().SetPosition(EARTH_RADIUS + 1000, 0, 0)
+  #renderer.GetActiveCamera().Elevation(midLatitude)
+  #renderer.GetActiveCamera().Azimuth(midLongitude)
+  renderer.GetActiveCamera().SetFocalPoint(focalPoint)
+  renderer.GetActiveCamera().SetRoll(-50)
+  renderer.GetActiveCamera().Elevation(-60)
+  renderer.GetActiveCamera().Dolly(0.1)
+  renderer.ResetCamera()
+
 
   # Here we specify a particular interactor style.
   style = KeyPressInteractorStyle(renderWindow, renderWindowInteractor)
