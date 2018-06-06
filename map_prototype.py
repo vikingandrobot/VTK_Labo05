@@ -114,7 +114,7 @@ def main():
 
   gliderData = glider.loadGliderTrajectory("data/vtkgps.txt")
   colors = glider.computeGliderTrajectoryColors(gliderData.gliderTrajectory, gliderData.minVerticalSpeed, gliderData.maxVerticalSpeed)
-  glidersActors = glider.createActors(gliderData.vtkPoints, colors, gliderData.gliderTrajectory)
+  glidersActors = glider.createActors(gliderData.vtkPoints, colors)
 
   renderer = vtk.vtkRenderer()
   renderer.AddActor(actor)
@@ -126,7 +126,7 @@ def main():
   renderWindow.AddRenderer(renderer)
   renderWindowInteractor = vtk.vtkRenderWindowInteractor()
   renderWindowInteractor.SetRenderWindow(renderWindow)
-  
+
   # Positionning the camera
   renderer.SetBackground(0, 0, 0)
   #renderer.GetActiveCamera().SetPosition(EARTH_RADIUS + 1000, 0, 0)

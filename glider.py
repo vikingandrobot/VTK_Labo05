@@ -2,18 +2,29 @@ import vtk
 import datetime as dt
 import pyproj
 
-LONGITUDE_INDEX = 0
-LATITUDE_INDEX = 1
+X_INDEX = 0
+Y_INDEX = 1
 ALTITUDE_INDEX = 2
 DATE_TIME_INDEX = 3
 
 EARTH_RADIUS = 6371009
+
 
 class GliderTrajectory(object):
     pass
 
 
 def computeVerticalSpeed(gliderTrajectory, index):
+    """ Calculate the verical speed of the glider given its trajectory
+    and a position index.
+    Args:
+        gliderTrajectory - Array of lists representing the glider position
+        at different times.
+        index - position in the array at which to compute the vertical speed.
+        Must be > 1
+    Returns:
+        The vertical speed value
+    """
     lastDateTime = gliderTrajectory[index - 1][DATE_TIME_INDEX]
     dateTime = gliderTrajectory[index][DATE_TIME_INDEX]
     lastAltitude = gliderTrajectory[index - 1][ALTITUDE_INDEX]
@@ -22,6 +33,17 @@ def computeVerticalSpeed(gliderTrajectory, index):
 
 
 def loadGliderTrajectory(filename):
+    """ Load the glider trajectory from a text file, computing a VtkPoints
+    converted at the right longitude and latitude around the globe. It also
+    calculates the max vertical speed and the min vertical speed that occurs
+    on the trajectory.
+    Args:
+        filename - String
+    Returns:
+        A GliderTrajectory containing an array representing the trajectory of
+        the glider in RT90 coordinates, a VtkPoints, and the min and max
+        vertical speed that occured on the trajectory.
+    """
     vtkPoints = vtk.vtkPoints()
     gliderTrajectory = []
     minVerticalSpeed = 0
@@ -57,11 +79,13 @@ def loadGliderTrajectory(filename):
             # Add the coordinates
             gliderTrajectory.append(coordinates)
 
-            # VTK points
+            # Create VTKPoints
+            # Convert the RT90 to Longitude/Latitude coordinates
             rt90Proj = pyproj.Proj(init='epsg:3021')
             wgs84 = pyproj.Proj(init="epsg:4326")
             longlat = pyproj.transform(rt90Proj, wgs84, int(values[1]), int(values[2]))
-            #print(longlat)
+
+            # Rotate a point around the globe
             p = [EARTH_RADIUS + coordinates[ALTITUDE_INDEX], 0, 0]
             transform1 = vtk.vtkTransform()
             transform1.RotateY(longlat[0])
@@ -69,7 +93,7 @@ def loadGliderTrajectory(filename):
             transform2.RotateZ(longlat[1])
             vtkPoints.InsertNextPoint(transform1.TransformPoint(transform2.TransformPoint(p)))
 
-            # Min / Max delta
+            # Calculating min and max vertical speed
             index = lineCount - 1
             if (index > 0):
                 verticalSpeed = computeVerticalSpeed(gliderTrajectory, index)
@@ -88,14 +112,27 @@ def loadGliderTrajectory(filename):
 
 
 def computeGliderTrajectoryColors(gliderTrajectory, minVerticalSpeed, maxVerticalSpeed):
+    """ Compute the colors to display the glider's trajectory. If the vertical
+    speed at a given point is >= 0, it will be from yellow to red (for hot air),
+    and if the vertical speed is < 0, it will be blue. Two LookupTable were
+    used to have to different scales of color for ascending and descending
+    trajectory.
+    Args:
+        gliderTrajectory: The glider trajectory
+        minVerticalSpeed: min vertical speed
+        maxVerticalSpeed: max vertical speed
+    Returns:
+        An array of colors
+    """
+
     lutAsc = vtk.vtkLookupTable()
     lutAsc.SetTableRange(0, maxVerticalSpeed)
-    lutAsc.SetHueRange(1/6, 0)
+    lutAsc.SetHueRange(1/8, 0)
     lutAsc.Build()
 
     lutDesc = vtk.vtkLookupTable()
     lutDesc.SetTableRange(minVerticalSpeed, 0)
-    lutDesc.SetHueRange(3/6, 2/6)
+    lutDesc.SetHueRange(5/8, 1/2)
     lutDesc.Build()
 
     colors = vtk.vtkUnsignedCharArray()
@@ -120,10 +157,18 @@ def computeGliderTrajectoryColors(gliderTrajectory, minVerticalSpeed, maxVertica
     return colors
 
 
-def createActors(vtkPoints, colors, gliderTrajectory):
+def createActors(vtkPoints, colors):
+    """ Create the actors to display the trajectory. It uses a PolyLine and
+    a TubeFilter.
+    Args:
+        vtkPoints - VtkPoints
+        colors - Array of colors
+    Returns:
+        tuple of actors, one for the PolyLine and one for the TubeFilter.
+    """
     polyLine = vtk.vtkPolyLine()
-    polyLine.GetPointIds().SetNumberOfIds(len(gliderTrajectory))
-    for i in range(0, len(gliderTrajectory)):
+    polyLine.GetPointIds().SetNumberOfIds(vtkPoints.GetNumberOfPoints())
+    for i in range(0, vtkPoints.GetNumberOfPoints()):
         polyLine.GetPointIds().SetId(i, i)
 
     cells = vtk.vtkCellArray()
