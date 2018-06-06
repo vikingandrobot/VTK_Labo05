@@ -71,7 +71,7 @@ def main():
   print("Building points...")
   points = vtk.vtkPoints()
 
-  for y in range(minLatitude, maxLatitude):
+  for y in range(cols - maxLatitude, cols - minLatitude):
     transform2 = vtk.vtkTransform()
     transform2.RotateZ(y * latitudeDelta + MAP_MIN_Y)
 
