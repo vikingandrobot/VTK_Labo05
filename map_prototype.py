@@ -5,6 +5,43 @@ import glider
 
 from keypressInteractorStyle import KeyPressInteractorStyle
 
+RT90_MAP_MIN_X = 1349340
+RT90_MAP_MAX_X = 1371835
+RT90_MAP_MIN_Y = 7005969
+RT90_MAP_MAX_Y = 7022967
+
+def mapCoordinatesToTexture(lat, longitude):
+  """ This function maps (latitude, longitude) coordinates (wgs84) to 
+  the image texture coordinates (x: [0, 1] and y: [0, 1]). 
+  It first converts the 
+  given latitude and longitude to a RT90 point. Then if the point is inside 
+  the map texture rectange (delimited by known and provided RT90 coordinates for this lab)
+  it returns its relative position inside this rectangle (x: [0, 1], y: [0, 1]) corresponding
+  to the texture coordinates for this point. If the point is outside, it returns a
+  (-1, -1) point.
+  Args:
+    lat: latitude
+    longitude: longitude
+  Returns: 
+    A tuple containing the texture coordinate inside the map image or (-1, -1) if the given point
+    is outside of the map.
+  """
+  # Convert the wgs84 point to RT90
+  rt90Proj = pyproj.Proj(init='epsg:3021')
+  wgs84 = pyproj.Proj(init="epsg:4326")
+  (tx, ty) = pyproj.transform(wgs84, rt90Proj, longitude, lat)
+
+  # Check if the point is inside the map area
+  if (tx > RT90_MAP_MIN_X and tx < RT90_MAP_MAX_X and ty > RT90_MAP_MIN_Y and ty < RT90_MAP_MAX_Y):
+    # Compute the relative texture coordinates
+    cx = (tx - RT90_MAP_MIN_X) / (RT90_MAP_MAX_X - RT90_MAP_MIN_X)
+    cy = (ty - RT90_MAP_MIN_Y) / (RT90_MAP_MAX_Y - RT90_MAP_MIN_Y)
+
+    return (cx, cy)
+
+  else:
+    return (-1, -1)
+
 
 def main():
   FILENAME = "data/EarthEnv-DEM90_N60E010.bil"
@@ -72,6 +109,11 @@ def main():
   print("Building points...")
   points = vtk.vtkPoints()
 
+  # Texture coordinates values
+  textureCoordinates = vtk.vtkFloatArray()
+  textureCoordinates.SetNumberOfComponents(2)
+  textureCoordinates.SetName("TextureCoordinates")
+
   for y in range(cols - maxLatitude, cols - minLatitude):
     transform2 = vtk.vtkTransform()
     transform2.RotateZ(ELEVATION_MAX_Y - y * latitudeDelta)#MAP_MIN_Y)
@@ -81,6 +123,7 @@ def main():
 
     for x in range(minLongitude, maxLongitude):
       p = [EARTH_RADIUS + elevationModel[y * rows + x], 0, 0]
+
 
       transform1.RotateY(longitudeDelta)
 
@@ -92,7 +135,19 @@ def main():
               )
           )
       )
+
+      # Compute texture coordinates
+      (cx, cy) = mapCoordinatesToTexture(
+          ELEVATION_MAX_Y - (y + 1) * latitudeDelta,
+          ELEVATION_MIN_X + (x - 1) * longitudeDelta
+          )
+
+      textureCoordinates.InsertNextTuple((cx, cy))
   print("Done.")
+
+  # Reader for JPEG image
+  jPEGReader = vtk.vtkJPEGReader()
+  jPEGReader.SetFileName("data/glider_map.jpg")
 
 
   print("Building structuredGrid")
@@ -105,12 +160,18 @@ def main():
   gf.SetInputData(sg)
   gf.Update()
 
+  # Set texture coordinates
+  sg.GetPointData().SetTCoords(textureCoordinates)
+  texture = vtk.vtkTexture()
+  texture.SetInputConnection(jPEGReader.GetOutputPort())
+
 
   mapper = vtk.vtkPolyDataMapper()
   mapper.SetInputConnection(gf.GetOutputPort())
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
   actor.GetProperty().SetPointSize(3)
+  actor.SetTexture(texture)
 
   gliderData = glider.loadGliderTrajectory("data/vtkgps.txt")
   colors = glider.computeGliderTrajectoryColors(gliderData.gliderTrajectory, gliderData.minVerticalSpeed, gliderData.maxVerticalSpeed)
