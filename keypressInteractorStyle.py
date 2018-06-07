@@ -1,4 +1,4 @@
-# Labo 3 - Carte topographique en relief
+# VTK - Labo 5 - Planeur
 # Author : Sathiya Kirushnapillai, Mathieu Monteverde
 
 import vtk

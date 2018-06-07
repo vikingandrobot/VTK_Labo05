@@ -1,3 +1,6 @@
+# VTK - Labo 5 - Planeur
+# Author : Sathiya Kirushnapillai, Mathieu Monteverde
+
 import vtk
 import datetime as dt
 import pyproj
