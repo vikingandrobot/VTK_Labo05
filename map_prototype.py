@@ -39,6 +39,23 @@ def convertRT90ToWGS84(x, y):
   return pyproj.transform(rt90Proj, wgs84, x, y)
 
 
+def convertWGS84ToRT90(longitude, latitude):
+  """ Convert Longitude/latitude to RT90 coordinates
+
+  Args:
+    longitude: longitude°
+    latitude: latitude°
+
+  Returns:
+    A tuple (x, y)
+  """
+
+  rt90Proj = pyproj.Proj(init='epsg:3021')
+  wgs84 = pyproj.Proj(init="epsg:4326")
+
+  return  pyproj.transform(wgs84, rt90Proj, longitude, latitude)
+
+
 def mapCoordinatesToTexture(lat, longitude):
   """ This function maps (latitude, longitude) coordinates (wgs84) to the image 
   texture coordinates (x: [0, 1] and y: [0, 1]). 
@@ -59,9 +76,7 @@ def mapCoordinatesToTexture(lat, longitude):
   """
 
   # Convert the wgs84 point to RT90
-  rt90Proj = pyproj.Proj(init='epsg:3021')
-  wgs84 = pyproj.Proj(init="epsg:4326")
-  (tx, ty) = pyproj.transform(wgs84, rt90Proj, longitude, lat)
+  (tx, ty) = convertWGS84ToRT90(longitude, lat)
 
   # Check if the point is inside the map area
   if (tx > RT90_MAP_MIN_X and 
